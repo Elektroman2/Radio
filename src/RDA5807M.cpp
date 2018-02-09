@@ -378,7 +378,8 @@ void RDA5807M::checkRDS()
       Wire.write(RADIO_REG_RDSA);                   // Start at Register 0x0C
       Wire.endTransmission(0);                         // restart condition
       
-      Wire.requestFrom(I2C_INDX, 8, 1);                  // Retransmit device address with READ, followed by 8 bytes
+      Wire.requestFrom(I2C_INDX, 8);                  // Retransmit device address with READ, followed by 8 bytes
+      Wire.endTransmission();
       newData = _read16();
       if (newData != registers[RADIO_REG_RDSA]) { registers[RADIO_REG_RDSA] = newData; result = true; }
 
@@ -480,7 +481,8 @@ void RDA5807M::debugStatus()
   Wire.beginTransmission(I2C_INDX);                // Device 0x11 for random access
   Wire.write(0x00);                   // Start at Register 0x0C
   Wire.endTransmission(0);                         // restart condition
-  Wire.requestFrom(I2C_INDX,32,1);                  // Retransmit device address with READ, followed by 8 bytes
+  Wire.requestFrom(I2C_INDX,32);                  // Retransmit device address with READ, followed by 8 bytes
+  Wire.endTransmission();
   for (int n = 0; n < 16; n++) {
     _printHex4(_read16());
   }
