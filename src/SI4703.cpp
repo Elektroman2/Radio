@@ -35,7 +35,7 @@
 // int STATUS_LED = 13;
 #define resetPin 2
 // SDA/A4 on Arduino
-#define SDIO A4
+#define SDIO 4
 // int SCLK = A5; //SCL/A5 on Arduino
 
 // Register Definitions -----
