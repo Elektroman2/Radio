@@ -142,7 +142,7 @@ public:
 
   RADIO(); ///< create a new object from this class.
   virtual ~RADIO(){};
-  virtual bool   init();  ///< initialize library and the chip.
+  virtual bool   init(TwoWire *iicTheOther);  ///< initialize library and the chip.
   virtual void   term();  ///< terminate all radio functions.
 
   // ----- Audio features -----
@@ -204,6 +204,7 @@ public:
   virtual void debugStatus();    ///< Send debug information about actual available chip functionality and other internal things.
 
 protected:
+  TwoWire *iicRadio;
   bool _debugEnabled; ///< Set by debugEnable() and controls debugging functionality.
 
   uint8_t _volume;    ///< Last set volume level.

@@ -41,7 +41,7 @@
 #define RADIO_REG_CTRL_ENABLE 0x0001
 
 #define RADIO_REG_CHAN    0x03
-#define RADIO_REG_CHAN_SPACE     0x0003
+#define RADIO_REG_CHAN_SPACE  0x0003
 #define RADIO_REG_CHAN_SPACE_100 0x0000
 #define RADIO_REG_CHAN_BAND      0x000C
 #define RADIO_REG_CHAN_BAND_FM      0x0000
@@ -92,13 +92,14 @@ RDA5807M::RDA5807M() {
 }
 
 // initialize all internals.
-bool RDA5807M::init() {
+bool RDA5807M::init(TwoWire *iicTheOther) {
+	iicRadio = iicTheOther;
   bool result = false; // no chip found yet.
   DEBUG_FUNC0("init");
 
-  Wire.begin();
-  Wire.beginTransmission(I2C_INDX);
-  result = Wire.endTransmission();
+  iicRadio->begin();
+  iicRadio->beginTransmission(I2C_INDX);
+  result = iicRadio->endTransmission();
   if (result == 0) {
     DEBUG_STR("radio found.");
     result = true;
@@ -106,10 +107,11 @@ bool RDA5807M::init() {
     // initialize all registers
     registers[RADIO_REG_CHIPID] = 0x5804;  // 00 id
     registers[1] = 0x0000;  // 01 not used
-    registers[RADIO_REG_CTRL] = (RADIO_REG_CTRL_RESET | RADIO_REG_CTRL_ENABLE);
+    registers[RADIO_REG_CTRL] = (RADIO_REG_CTRL_RESET | RADIO_REG_CTRL_ENABLE | RADIO_REG_CTRL_NEW);
     setBand(RADIO_BAND_FM);
     registers[RADIO_REG_R4] = RADIO_REG_R4_EM50;//  0x1800;  // 04 DE ? SOFTMUTE
-    registers[RADIO_REG_VOL] = 0x9081; // 0x81D1;  // 0x82D1 / INT_MODE, SEEKTH=0110,????, Volume=1
+    //registers[RADIO_REG_VOL] = 0x9081; // 0x81D1;  // 0x82D1 / INT_MODE, SEEKTH=0110,????, Volume=1
+    registers[RADIO_REG_VOL] = 0x108F; // 0x81D1;  // 0x82D1 / INT_MODE, SEEKTH=0110,????, Volume=1
     registers[6] = 0x0000;
     registers[7] = 0x0000;
     registers[8] = 0x0000;
@@ -118,7 +120,7 @@ bool RDA5807M::init() {
     // reset the chip
     _saveRegisters();
 
-    registers[RADIO_REG_CTRL] = RADIO_REG_CTRL_ENABLE;
+    registers[RADIO_REG_CTRL] = (RADIO_REG_CTRL_ENABLE | RADIO_REG_CTRL_NEW);
     _saveRegister(RADIO_REG_CTRL);
   }  // if
   return(result);
@@ -226,10 +228,13 @@ void RDA5807M::setBand(RADIO_BAND newBand) {
 // retrieve the real frequency from the chip after automatic tuning.
 RADIO_FREQ RDA5807M::getFrequency() {
   // check register A
-  Wire.requestFrom (I2C_SEQ, 2);
+/*	iicRadio->beginTransmission(I2C_INDX);
+	iicRadio->write(RADIO_REG_RA);
+  iicRadio->requestFrom (I2C_INDX, 2);
   registers[RADIO_REG_RA] = _read16();
-  Wire.endTransmission();
-
+  iicRadio->endTransmission();
+  */
+	_readRegisters();
   uint16_t ch = registers[RADIO_REG_RA] & RADIO_REG_RA_NR;
   
   _freq = _freqLow + (ch * 10);  // assume 100 kHz spacing
@@ -250,7 +255,7 @@ void RDA5807M::setFrequency(RADIO_FREQ newF) {
   regChannel |= newChannel << 6;
   
   // enable output and unmute
-  registers[RADIO_REG_CTRL] |= RADIO_REG_CTRL_OUTPUT | RADIO_REG_CTRL_UNMUTE | RADIO_REG_CTRL_RDS | RADIO_REG_CTRL_ENABLE; //  | RADIO_REG_CTRL_NEW
+  registers[RADIO_REG_CTRL] |= RADIO_REG_CTRL_OUTPUT | RADIO_REG_CTRL_UNMUTE | RADIO_REG_CTRL_RDS | RADIO_REG_CTRL_ENABLE | RADIO_REG_CTRL_NEW;
   _saveRegister(RADIO_REG_CTRL);
 
   registers[RADIO_REG_CHAN] = regChannel;
@@ -295,11 +300,12 @@ void RDA5807M::seekDown(bool toNextSender) {
 // using the sequential read access mode.
 void RDA5807M::_readRegisters()
 {
-  Wire.requestFrom (I2C_SEQ, (6 * 2) );
+  iicRadio->requestFrom (I2C_SEQ, (6 * 2) );
+//  iicRadio->endTransmission();
   for (int i = 0; i < 6; i++) {
     registers[0xA+i] = _read16();
   }
-  Wire.endTransmission();
+
 }
 
 
@@ -309,10 +315,10 @@ void RDA5807M::_readRegisters()
 void RDA5807M::_saveRegisters()
 {
   DEBUG_FUNC0("-saveRegisters");
-  Wire.beginTransmission(I2C_SEQ);
+  iicRadio->beginTransmission(I2C_SEQ);
   for (int i = 2; i <= 6; i++)
   _write16(registers[i]);
-  Wire.endTransmission();
+  iicRadio->endTransmission();
 } // _saveRegisters
 
 
@@ -321,10 +327,10 @@ void RDA5807M::_saveRegister(byte regNr)
 {
   DEBUG_FUNC2X("-_saveRegister", regNr, registers[regNr]);
 
-  Wire.beginTransmission(I2C_INDX);
-  Wire.write(regNr);
+  iicRadio->beginTransmission(I2C_INDX);
+  iicRadio->write(regNr);
   _write16(registers[regNr]);
-  Wire.endTransmission();
+  iicRadio->endTransmission();
 } // _saveRegister
 
 
@@ -332,15 +338,15 @@ void RDA5807M::_saveRegister(byte regNr)
 // write a register value using 2 bytes into the Wire.
 void RDA5807M::_write16(uint16_t val)
 {
-  Wire.write(val >> 8); Wire.write(val & 0xFF);
+  iicRadio->write(val >> 8); iicRadio->write(val & 0xFF);
 } // _write16
 
 
 // read a register value using 2 bytes in a row
 uint16_t RDA5807M::_read16(void)
 {
-  uint8_t hiByte = Wire.read();
-  uint8_t loByte = Wire.read();
+  uint8_t hiByte = iicRadio->read();
+  uint8_t loByte = iicRadio->read();
   return(256*hiByte + loByte);
 } // _read16
 
@@ -361,9 +367,9 @@ void RDA5807M::checkRDS()
   if (_sendRDS) {
 
     // check register A
-    Wire.requestFrom (I2C_SEQ, 2);
+    iicRadio->requestFrom (I2C_SEQ, 2);
     registers[RADIO_REG_RA] = _read16();
-    Wire.endTransmission();
+    //iicRadio->endTransmission();
 
     if (registers[RADIO_REG_RA] & RADIO_REG_RA_RDSBLOCK) {
       DEBUG_STR("BLOCK_E found.");
@@ -374,12 +380,12 @@ void RDA5807M::checkRDS()
       uint16_t newData;
       bool result = false;
       
-      Wire.beginTransmission(I2C_INDX);                // Device 0x11 for random access
-      Wire.write(RADIO_REG_RDSA);                   // Start at Register 0x0C
-      Wire.endTransmission(0);                         // restart condition
+      iicRadio->beginTransmission(I2C_INDX);                // Device 0x11 for random access
+      iicRadio->write(RADIO_REG_RDSA);                   // Start at Register 0x0C
+      iicRadio->endTransmission(0);                         // restart condition
       
-      Wire.requestFrom(I2C_INDX, 8);                  // Retransmit device address with READ, followed by 8 bytes
-      Wire.endTransmission();
+      iicRadio->requestFrom(I2C_INDX, 8);                  // Retransmit device address with READ, followed by 8 bytes
+     // iicRadio->endTransmission();
       newData = _read16();
       if (newData != registers[RADIO_REG_RDSA]) { registers[RADIO_REG_RDSA] = newData; result = true; }
 
@@ -392,7 +398,7 @@ void RDA5807M::checkRDS()
       newData = _read16();
       if (newData != registers[RADIO_REG_RDSD]) { registers[RADIO_REG_RDSD] = newData; result = true; }
 
-      Wire.endTransmission();
+    //  iicRadio->endTransmission();
       // _printHex(registers[RADIO_REG_RDSA]); _printHex(registers[RADIO_REG_RDSB]);
       // _printHex(registers[RADIO_REG_RDSC]); _printHex(registers[RADIO_REG_RDSD]);
       // Serial.println();
@@ -478,15 +484,15 @@ void RDA5807M::debugStatus()
   Serial.println();
   
   // registers
-  Wire.beginTransmission(I2C_INDX);                // Device 0x11 for random access
-  Wire.write(0x00);                   // Start at Register 0x0C
-  Wire.endTransmission(0);                         // restart condition
-  Wire.requestFrom(I2C_INDX,32);                  // Retransmit device address with READ, followed by 8 bytes
-  Wire.endTransmission();
+  iicRadio->beginTransmission(I2C_INDX);                // Device 0x11 for random access
+  iicRadio->write(0x00);                   // Start at Register 0x0C
+  iicRadio->endTransmission(0);                         // restart condition
+  iicRadio->requestFrom(I2C_INDX,32);                  // Retransmit device address with READ, followed by 8 bytes
+  iicRadio->endTransmission();
   for (int n = 0; n < 16; n++) {
     _printHex4(_read16());
   }
-  Wire.endTransmission();
+  iicRadio->endTransmission();
   Serial.println();
   
   // clear text information in Registers

@@ -108,7 +108,7 @@ void RDSParser::processData(uint16_t block1, uint16_t block2, uint16_t block3, u
       _PSName1[idx] = c1;
       _PSName1[idx + 1] = c2;
       _PSName1[8] = '\0';
-      // Serial.println(_PSName1);
+       Serial.println(_PSName1);
     } // if
     break;
 
@@ -129,7 +129,7 @@ void RDSParser::processData(uint16_t block1, uint16_t block2, uint16_t block3, u
       // when this bit is toggled the whole buffer should be cleared.
       _last_textAB = _textAB;
       memset(_RDSText, 0, sizeof(_RDSText));
-      // Serial.println("T>CLEAR");
+       Serial.println("T>CLEAR");
     } // if
 
 
@@ -141,8 +141,8 @@ void RDSParser::processData(uint16_t block1, uint16_t block2, uint16_t block3, u
     _RDSText[idx] = (block4 >> 8);     idx++;
     _RDSText[idx] = (block4 & 0x00FF); idx++;
 
-    // Serial.print(' '); Serial.println(_RDSText);
-    // Serial.print("T>"); Serial.println(_RDSText);
+     Serial.print(' '); Serial.println(_RDSText);
+     Serial.print("T>"); Serial.println(_RDSText);
     break;
 
   case 0x4A:
@@ -185,7 +185,7 @@ void RDSParser::processData(uint16_t block1, uint16_t block2, uint16_t block3, u
     break;
 
   default:
-    // Serial.print("RDS_GRP:"); Serial.println(rdsGroupType, HEX);
+   //  Serial.print("RDS_GRP:"); Serial.println(rdsGroupType, HEX);
     break;
   }
 } // processData()

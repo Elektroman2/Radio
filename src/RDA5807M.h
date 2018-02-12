@@ -43,7 +43,7 @@ class RDA5807M : public RADIO {
 
   RDA5807M();
   
-  bool   init();
+  bool   init(TwoWire *iicTheOther);
   void   term();
   
   // ----- Audio features -----

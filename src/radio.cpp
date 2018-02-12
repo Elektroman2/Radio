@@ -38,7 +38,7 @@ RADIO::RADIO() {
 
 
 /// The RADIO class doesn't implement a concrete chip so nothing has to be initialized.
-bool RADIO::init() {
+bool RADIO::init(TwoWire *iicTheOther) {
   return(false);
 } // init()
 
